@@ -226,6 +226,8 @@ export interface InvoicePaymentInfo {
   currencyRate: number;
 }
 
+export type InvoiceSmartScanInvoice = object;
+
 export interface ModelsClientAutomation {
   allowedCounterPartyNames?: string[];
   allowedPredictedLabels?: string[];
@@ -233,6 +235,9 @@ export interface ModelsClientAutomation {
   blockedPredictedLabels?: string[];
   createdAt?: string;
   id?: number;
+  inactiveEnd?: string;
+  inactiveRepeatEveryYear?: boolean;
+  inactiveStart?: string;
   maximumAllowedAbsoluteExpectedErrorValueForItem?: number;
   maximumAllowedAbsoluteInvoiceTotal?: number;
   minimumRequiredProbability?: number;
@@ -311,16 +316,35 @@ export interface ModelsModelTrainingRequestsLog {
 }
 
 export interface ModelsOrganization {
+  billingEmail?: string;
+  billingIdentifier?: string;
+  billingReference?: string;
+  businessId?: string;
+  city?: string;
+  country?: string;
   createdAt?: string;
+  einvoiceAddress?: string;
+  einvoiceOperator?: string;
   id?: number;
   name?: string;
+  streetAddress?: string;
   tags?: TypesHStore;
+  updatedAt?: string;
+  zipCode?: string;
+}
+
+export interface ModelsOrganizationKey {
+  createdAt?: string;
+  description?: string;
+  prefix?: string;
+  scope?: string;
   updatedAt?: string;
 }
 
 export interface ModelsProvider {
   createdAt?: string;
   name?: string;
+  tags?: TypesHStore;
   updatedAt?: string;
 }
 
@@ -340,13 +364,12 @@ export interface ModelsUser {
   updatedAt?: string;
 }
 
-export interface ModextAPIKeyDetails {
-  createdAt?: string;
-  description?: string;
-  lastUsed?: string;
-  prefix?: string;
-  scope?: string;
-  updatedAt?: string;
+export interface ModelsVatRate {
+  endDate?: string;
+  /** The id of the new vat rate that replaces this one */
+  replacedById?: number;
+  startDate?: string;
+  value?: number;
 }
 
 export interface ModextAuthProviderDetails {
@@ -373,6 +396,15 @@ export interface ModextClient {
    * @example 4123
    */
   id?: number;
+  /** The client's industry in plain text */
+  industry?: string;
+  /** The NACE / TOL2008 code for the client's industry. If you have the NACE code e.g. A1.4.1, convert this to 0141 as the database expects ^[0-9]+$ */
+  industryCode?: string;
+  /**
+   * When the invoices were last checked and sent from accounting software to ai-inside
+   * Can be used to e.g. keep track of when the client was last updated
+   */
+  invoicesLastFetchedAt?: string;
   /** Official name of the client */
   name: string;
   /**
@@ -402,9 +434,11 @@ export interface ModextClient {
 export interface ModextCollectionClient {
   createdAt?: string;
   id?: number;
+  invoicesLastFetchedAt?: string;
   name?: string;
   organization?: string;
   organizationId?: number;
+  status?: "ACTIVE" | "INACTIVE";
   system?: string;
   tags?: Record<string, string>;
   updatedAt?: string;
@@ -418,16 +452,32 @@ export interface ModextModelTrainingRequest {
   /** Required when label is DIMENSION */
   dimensionId?: string;
   label: "ACCOUNT" | "DIMENSION";
-  processorId: number;
+  /**
+   * The priority of the model training request - should be between -10 and 10. If not provided, the default value is 0.
+   * @min -10
+   * @max 10
+   */
+  priority?: number;
+  processorId?: number;
 }
 
 export interface ModextOrganization {
   apiKey?: TypesAPIKey;
+  billingEmail?: string;
+  billingIdentifier?: string;
+  billingReference?: string;
+  businessId?: string;
+  city?: string;
+  country?: string;
   createdAt?: string;
+  einvoiceAddress?: string;
+  einvoiceOperator?: string;
   id?: number;
   name?: string;
+  streetAddress?: string;
   tags?: TypesHStore;
   updatedAt?: string;
+  zipCode?: string;
 }
 
 export interface ModextPredictionModel {
@@ -480,7 +530,10 @@ export interface PredictionDetailedInvoice {
   automations?: ModelsInvoiceAutomation[];
   /** Name of the counter party as extracted from sellerAddress */
   counterPartyName?: string;
-  /** This is the time when the invoice was sent to AI Inside */
+  /**
+   * This is the time when the invoice was sent to AI Inside
+   * @example "2021-09-16T09:33:15.212Z"
+   */
   createdAt?: string;
   /**
    * Invoice's creation date in the seller's system
@@ -532,6 +585,11 @@ export interface PredictionDetailedInvoice {
    * @example 12.4
    */
   total?: number;
+  /**
+   * This is a timestamp of when the invoice or it's items were last edited in our database.
+   * @example "2021-09-16T09:33:15.212Z"
+   */
+  updatedAt?: string;
   /**
    * This is copy paste from the version timestamp you provided. You can use this to avoid any merge issues when using the predictions.
    * @example "2021-09-16T09:33:15.212Z"
@@ -590,6 +648,11 @@ export interface PredictionInvoice {
    */
   total?: number;
   /**
+   * This is a timestamp of when the invoice or it's items were last edited in our database.
+   * @example "2021-09-16T09:33:15.212Z"
+   */
+  updatedAt?: string;
+  /**
    * This is copy paste from the version timestamp you provided. You can use this to avoid any merge issues when using the predictions.
    * @example "2021-09-16T09:33:15.212Z"
    */
@@ -618,12 +681,14 @@ export interface PredictionInvoiceInput {
    * @example "101"
    */
   number?: string;
+  /** OCR data for the invoice. Note - if you have provided both the xml and invoice (JSON), the xml invoice takes precedence if the schema supported. */
+  ocr?: InvoiceSmartScanInvoice;
   /**
-   * Schema defines the invoice type for XML invoices (finvoice or peppol)
+   * Schema defines the invoice type for XML invoices (finvoice, peppol, teapps, or smartscan)
    * @default "finvoice"
    * @example "peppol"
    */
-  schema?: "peppol" | "finvoice";
+  schema?: "peppol" | "finvoice" | "teapps" | "smartscan";
   /**
    * Original Finvoice or PEPPOL invoice (we will do the parsing). Note - if you have provided both
    * the xml and invoice (JSON), the xml invoice takes precedence if the schema supported.
@@ -688,9 +753,21 @@ export interface ResponseCollectionResponseModelsUser {
   totalCount?: number;
 }
 
+export interface ResponseCollectionResponseModelsVatRate {
+  count?: number;
+  data?: ModelsVatRate[];
+  totalCount?: number;
+}
+
 export interface ResponseCollectionResponseModextTeam {
   count?: number;
   data?: ModextTeam[];
+  totalCount?: number;
+}
+
+export interface ResponseCollectionResponseRouterClientRule {
+  count?: number;
+  data?: RouterClientRule[];
   totalCount?: number;
 }
 
@@ -727,13 +804,22 @@ export interface ResponseToken {
 export interface RouterAPIKeyCollection {
   /** @example 123 */
   count?: number;
-  data?: ModextAPIKeyDetails[];
+  data?: ModelsOrganizationKey[];
 }
 
 export interface RouterClientCollection {
   /** @example 123 */
   count?: number;
   data?: ModextCollectionClient[];
+}
+
+export interface RouterClientRule {
+  createdAt?: string;
+  /** The external id of the client rule (from the accounting software or another external source) */
+  externalId?: string;
+  id?: number;
+  /** Rule is a JSON object that conforms to the schema found in rules/schema.json */
+  rule?: object;
 }
 
 export interface RouterInvoiceCollection {
@@ -772,12 +858,6 @@ export interface RouterUploadJobCollection {
   data?: ModelsTrainingDataUploadJob[];
 }
 
-export interface RouterUsageRecordCollection {
-  /** @example 123 */
-  count?: number;
-  data?: StoreUsageRecord[];
-}
-
 export interface StorageFileInfo {
   createdAt?: string;
   id?: string;
@@ -789,13 +869,6 @@ export interface StorageFileList {
   continuationToken?: string;
   count?: number;
   files?: StorageFileInfo[];
-}
-
-export interface StoreUsageRecord {
-  apiKeyPrefix?: string;
-  from?: string;
-  operations?: Record<string, number>;
-  to?: string;
 }
 
 export interface TrainingFile {
@@ -830,17 +903,19 @@ export interface TrainingInvoiceInput {
    * @minItems 1
    */
   invoiceTargets: TrainingInvoiceTarget[];
+  /** OCR data for the invoice. Note - if you have provided both the xml and invoice (JSON), the xml invoice takes precedence if the schema supported. */
+  ocr?: InvoiceSmartScanInvoice;
   /**
    * Date after which this invoice cannot be used to train a model
    * @example "2022-01-01T00:00:00.000Z"
    */
   retentionPolicy?: string;
   /**
-   * Schema defines the invoice type for XML invoices (finvoice or peppol)
+   * Schema defines the invoice type for XML invoices (finvoice, peppol, teapps, or smartscan)
    * @default "finvoice"
    * @example "peppol"
    */
-  schema?: "peppol" | "finvoice";
+  schema?: "peppol" | "finvoice" | "teapps" | "smartscan";
   /** @example 1631784795212 */
   version?: number;
   /**
@@ -1064,7 +1139,8 @@ export interface TypesRootDimension {
   name: string;
 }
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, HeadersDefaults, ResponseType } from "axios";
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, HeadersDefaults, ResponseType } from "axios";
+import axios from "axios";
 
 export type QueryParamsType = Record<string | number, any>;
 
@@ -1142,6 +1218,9 @@ export class HttpClient<SecurityDataType = unknown> {
   }
 
   protected createFormData(input: Record<string, unknown>): FormData {
+    if (input instanceof FormData) {
+      return input;
+    }
     return Object.keys(input || {}).reduce((formData, key) => {
       const property = input[key];
       const propertyContent: any[] = property instanceof Array ? property : [property];
@@ -1184,7 +1263,7 @@ export class HttpClient<SecurityDataType = unknown> {
       ...requestParams,
       headers: {
         ...(requestParams.headers || {}),
-        ...(type && type !== ContentType.FormData ? { "Content-Type": type } : {}),
+        ...(type ? { "Content-Type": type } : {}),
       },
       params: query,
       responseType: responseFormat,
@@ -1196,7 +1275,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title AI Inside
- * @version v2.21.0
+ * @version v2.27.3
  * @termsOfService https://fabricai.fi
  * @baseUrl https://ai.fabricai.io
  * @contact API Support (https://fabricai.fi)
@@ -1307,6 +1386,24 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         secure: true,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get the JSON schema for client rules
+     *
+     * @tags Rules
+     * @name GetClientRuleSchema
+     * @summary Get the client rule JSON schema
+     * @request GET:/clients/rules/schema.json
+     * @secure
+     * @response `200` `void` OK
+     */
+    getClientRuleSchema: (params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/clients/rules/schema.json`,
+        method: "GET",
+        secure: true,
         ...params,
       }),
 
@@ -1619,6 +1716,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         status?: string[];
         total?: string[];
         totalProbability?: string[];
+        updatedAt?: string[];
         version?: string[];
       },
       params: RequestParams = {},
@@ -1724,7 +1822,15 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `404` `ResponseErrorResponse` Not Found
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
-    getInvoice: (invoiceId: string, clientId: number, params: RequestParams = {}) =>
+    getInvoice: (
+      invoiceId: string,
+      clientId: number,
+      query?: {
+        /** Whether to merge invoice rows such that any rows with the same account, vat status, dimensions, vat deduction percent, and vat percent are merged. */
+        merge?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
       this.request<
         ResponseDataResponse & {
           data?: PredictionDetailedInvoice;
@@ -1733,6 +1839,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       >({
         path: `/clients/${clientId}/invoices/${invoiceId}`,
         method: "GET",
+        query: query,
         secure: true,
         format: "json",
         ...params,
@@ -1756,7 +1863,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `404` `ResponseErrorResponse` Not Found
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
-    deleteInvoice: (invoiceId: number, clientId: number, params: RequestParams = {}) =>
+    deleteInvoice: (invoiceId: string, clientId: number, params: RequestParams = {}) =>
       this.request<
         ResponseDataResponse & {
           data?: ResponseID;
@@ -1827,7 +1934,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `404` `ResponseErrorResponse` Not Found
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
-    addInvoiceItem: (invoiceId: number, clientId: number, invoiceItem: ModelsInvoiceItem, params: RequestParams = {}) =>
+    addInvoiceItem: (invoiceId: string, clientId: number, invoiceItem: ModelsInvoiceItem, params: RequestParams = {}) =>
       this.request<
         ResponseDataResponse & {
           data?: ModelsInvoiceItem;
@@ -1858,7 +1965,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * @response `404` `ResponseErrorResponse` Not Found
      * @response `500` `ResponseErrorResponse` Internal Server Error
      */
-    deleteInvoiceItem: (invoiceId: number, clientId: number, itemId: number, params: RequestParams = {}) =>
+    deleteInvoiceItem: (invoiceId: string, clientId: number, itemId: number, params: RequestParams = {}) =>
       this.request<void, ResponseErrorResponse>({
         path: `/clients/${clientId}/invoices/${invoiceId}/items/${itemId}`,
         method: "DELETE",
@@ -1885,7 +1992,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
     updateInvoiceItem: (
-      invoiceId: number,
+      invoiceId: string,
       clientId: number,
       itemId: number,
       invoiceItem: ModelsInvoiceItem,
@@ -1925,7 +2032,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
     addInvoiceProcessNote: (
-      invoiceId: number,
+      invoiceId: string,
       clientId: number,
       processNote: ModelsInvoiceProcessNote,
       params: RequestParams = {},
@@ -2036,6 +2143,110 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         method: "DELETE",
         secure: true,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get client rules
+     *
+     * @tags Rules
+     * @name GetClientRules
+     * @summary Get client rules
+     * @request GET:/clients/{clientId}/rules
+     * @secure
+     * @response `200` `ResponseCollectionResponseRouterClientRule` OK
+     * @response `400` `ResponseErrorResponse` Bad Request
+     * @response `401` `ResponseErrorResponse` Unauthorized
+     * @response `403` `ResponseErrorResponse` Forbidden
+     * @response `404` `ResponseErrorResponse` Not Found
+     * @response `500` `ResponseErrorResponse` Internal Server Error
+     */
+    getClientRules: (
+      clientId: number,
+      query?: {
+        externalId?: string[];
+        id?: string[];
+        /**
+         * @min 0
+         * @max 50
+         * @default 50
+         */
+        limit?: number;
+        /** @default "asc" */
+        order?: string;
+        /** @default "id" */
+        orderBy?: string;
+        /**
+         * @min 1
+         * @default 1
+         */
+        page?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseCollectionResponseRouterClientRule, ResponseErrorResponse>({
+        path: `/clients/${clientId}/rules`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+ * @description Create a new client rule
+ *
+ * @tags Rules
+ * @name CreateClientRule
+ * @summary Create client rule
+ * @request POST:/clients/{clientId}/rules
+ * @secure
+ * @response `201` `(ResponseDataResponse & {
+    data?: RouterClientRule,
+
+})` Created
+ * @response `400` `ResponseErrorResponse` Bad Request
+ * @response `401` `ResponseErrorResponse` Unauthorized
+ * @response `403` `ResponseErrorResponse` Forbidden
+ * @response `404` `ResponseErrorResponse` Not Found
+ * @response `500` `ResponseErrorResponse` Internal Server Error
+ */
+    createClientRule: (clientId: number, rule: RouterClientRule, params: RequestParams = {}) =>
+      this.request<
+        ResponseDataResponse & {
+          data?: RouterClientRule;
+        },
+        ResponseErrorResponse
+      >({
+        path: `/clients/${clientId}/rules`,
+        method: "POST",
+        body: rule,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Delete a client rule
+     *
+     * @tags Rules
+     * @name DeleteClientRule
+     * @summary Delete client rule
+     * @request DELETE:/clients/{clientId}/rules/{ruleId}
+     * @secure
+     * @response `204` `void` No Content
+     * @response `400` `ResponseErrorResponse` Bad Request
+     * @response `401` `ResponseErrorResponse` Unauthorized
+     * @response `403` `ResponseErrorResponse` Forbidden
+     * @response `404` `ResponseErrorResponse` Not Found
+     * @response `500` `ResponseErrorResponse` Internal Server Error
+     */
+    deleteClientRule: (clientId: number, ruleId: number, params: RequestParams = {}) =>
+      this.request<void, ResponseErrorResponse>({
+        path: `/clients/${clientId}/rules/${ruleId}`,
+        method: "DELETE",
+        secure: true,
         ...params,
       }),
 
@@ -2322,6 +2533,27 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         ResponseErrorResponse
       >({
         path: `/clients/${clientId}/training/jobs/${jobId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get VAT rates for a client
+     *
+     * @tags Clients
+     * @name GetVatRates
+     * @summary Get VAT rates for a client
+     * @request GET:/clients/{clientId}/vatRates
+     * @secure
+     * @response `200` `ResponseCollectionResponseModelsVatRate` OK
+     * @response `400` `ResponseErrorResponse` Bad Request
+     * @response `404` `ResponseErrorResponse` Not Found
+     */
+    getVatRates: (clientId: number, params: RequestParams = {}) =>
+      this.request<ResponseCollectionResponseModelsVatRate, ResponseErrorResponse>({
+        path: `/clients/${clientId}/vatRates`,
         method: "GET",
         secure: true,
         format: "json",
@@ -2686,40 +2918,6 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         format: "json",
         ...params,
       }),
-
-    /**
-     * @description Get usage statistics for an organization's API keys
-     *
-     * @tags Organizations
-     * @name GetOrganizationUsage
-     * @summary Get organization API key usage
-     * @request GET:/organizations/{orgId}/usage
-     * @secure
-     * @response `200` `RouterUsageRecordCollection` OK
-     * @response `400` `ResponseErrorResponse` Bad Request
-     * @response `401` `ResponseErrorResponse` Unauthorized
-     * @response `403` `ResponseErrorResponse` Forbidden
-     * @response `404` `ResponseErrorResponse` Not Found
-     * @response `500` `ResponseErrorResponse` Internal Server Error
-     */
-    getOrganizationUsage: (
-      orgId: number,
-      query?: {
-        /** Get statistics starting from (RFC3339) */
-        from?: string;
-        /** Get statistics up to (RFC3339) */
-        to?: string;
-      },
-      params: RequestParams = {},
-    ) =>
-      this.request<RouterUsageRecordCollection, ResponseErrorResponse>({
-        path: `/organizations/${orgId}/usage`,
-        method: "GET",
-        query: query,
-        secure: true,
-        format: "json",
-        ...params,
-      }),
   };
   processors = {
     /**
@@ -2966,46 +3164,6 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       >({
         path: `/token`,
         method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-  };
-  usage = {
-    /**
- * @description Get information about the currently authenticated provider's API key usage
- *
- * @tags Provider
- * @name GetProviderUsage
- * @summary Provider API key usage
- * @request GET:/usage
- * @secure
- * @response `200` `(ResponseDataResponse & {
-    data?: StoreUsageRecord,
-
-})` OK
- * @response `401` `ResponseErrorResponse` Unauthorized
- * @response `403` `ResponseErrorResponse` Forbidden
- * @response `500` `ResponseErrorResponse` Internal Server Error
- */
-    getProviderUsage: (
-      query?: {
-        /** Get statistics starting from (RFC3339) */
-        from?: string;
-        /** Get statistics up to (RFC3339) */
-        to?: string;
-      },
-      params: RequestParams = {},
-    ) =>
-      this.request<
-        ResponseDataResponse & {
-          data?: StoreUsageRecord;
-        },
-        ResponseErrorResponse
-      >({
-        path: `/usage`,
-        method: "GET",
-        query: query,
         secure: true,
         format: "json",
         ...params,

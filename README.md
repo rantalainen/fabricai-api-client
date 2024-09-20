@@ -10,13 +10,7 @@ Add to project's package.json:
 npm install @rantalainen/fabricai-api-client
 ```
 
-### Import to NodeJS project
-
-```javascript
-const { FabricAiApiClient } = require('@rantalainen/fabricai-api-client');
-```
-
-### Import to TypeScript project
+### Import
 
 ```javascript
 import { FabricAiApiClient } from '@rantalainen/fabricai-api-client';
@@ -44,7 +38,3 @@ Available methods can be found in the [Technical API documentation](https://ai.d
 - FabricAI: https://fabricai.fi/
 - FabricAI AI Inside Developer Guide: https://ai.dev.fabricai.io/docs/
 - FabricAI Technical API documentation: https://ai.dev.fabricai.io/docs/api/
-
-## Changelog
-
-- 1.0.0 First release
