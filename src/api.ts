@@ -432,6 +432,7 @@ export interface ModextClient {
 }
 
 export interface ModextCollectionClient {
+  businessId?: string;
   createdAt?: string;
   id?: number;
   invoicesLastFetchedAt?: string;
@@ -1275,7 +1276,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title AI Inside
- * @version v2.27.3
+ * @version v2.27.4
  * @termsOfService https://fabricai.fi
  * @baseUrl https://ai.fabricai.io
  * @contact API Support (https://fabricai.fi)
