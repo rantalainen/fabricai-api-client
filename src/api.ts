@@ -200,8 +200,13 @@ export interface InvoiceInvoiceRow {
    */
   valueInOriginalCurrency?: number;
   /**
+   * Vat deduction percentage that is applicable to this row
+   * @example 100
+   */
+  vatDeductionPercent?: number;
+  /**
    * Vat percentage that is applicable to this row
-   * @example 24
+   * @example 25.5
    */
   vatPercent: number;
   /**
@@ -360,6 +365,7 @@ export interface ModelsUser {
   createdAt?: string;
   email?: string;
   name?: string;
+  tags?: TypesHStore;
   uid?: string;
   updatedAt?: string;
 }
@@ -412,6 +418,11 @@ export interface ModextClient {
    * @example 4123
    */
   organizationId?: number;
+  /**
+   * Client overrides.
+   * If set, these will override the respective values on all rows of all invoices for this client.
+   */
+  overrides?: ModextClientOverrides;
   /** @default "BACKGROUND_PROCESS" */
   serviceTemplate?:
     | "BACKGROUND_PROCESS"
@@ -429,6 +440,28 @@ export interface ModextClient {
   /** The teams' IDs this client belongs to */
   teams?: number[];
   updatedAt?: string;
+}
+
+export interface ModextClientOverrides {
+  /**
+   * Override VAT deduction percentage for the client's invoices
+   * @min 0
+   * @max 100
+   * @example 50
+   */
+  vatDeductionPercent?: number;
+  /**
+   * Override VAT percentage for the client's invoices
+   * @min 0
+   * @max 100
+   * @example 25.5
+   */
+  vatPercent?: number;
+  /**
+   * Override VAT status for the client's invoices
+   * @example "vat_12"
+   */
+  vatStatus?: string;
 }
 
 export interface ModextCollectionClient {
@@ -520,6 +553,7 @@ export interface ModextUser {
   createdAt?: string;
   email?: string;
   name?: string;
+  tags?: TypesHStore;
   /** List of teams' IDs the user belongs to */
   teams?: number[];
   uid?: string;
@@ -1276,7 +1310,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
 /**
  * @title AI Inside
- * @version v2.27.4
+ * @version v2.28.1
  * @termsOfService https://fabricai.fi
  * @baseUrl https://ai.fabricai.io
  * @contact API Support (https://fabricai.fi)
@@ -1749,7 +1783,18 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
  * @response `404` `ResponseErrorResponse` Not Found
  * @response `500` `ResponseErrorResponse` Internal Server Error
  */
-    createInvoice: (clientId: number, invoice: PredictionInvoiceInput, params: RequestParams = {}) =>
+    createInvoice: (
+      clientId: number,
+      invoice: PredictionInvoiceInput,
+      query?: {
+        /**
+         * Reconciliation flag
+         * @default false
+         */
+        reconciliation?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
       this.request<
         ResponseDataResponse & {
           data?: PredictionDetailedInvoice;
@@ -1758,6 +1803,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       >({
         path: `/clients/${clientId}/invoices`,
         method: "POST",
+        query: query,
         body: invoice,
         secure: true,
         type: ContentType.Json,
